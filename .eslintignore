@@ -1,2 +1,4 @@
 node_modules
 db
+tailwind.config.js
+postcss.config.js
