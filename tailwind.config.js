@@ -7,7 +7,7 @@ module.exports = {
       "./src/components/**/*.{js,ts,jsx,tsx}"
     ],
     options: {
-      safelist: [/^bg-/, /^text-/]
+      safelist: [/^bg-/, /^text-/, /^border-/]
     }
   },
   darkMode: "class",
@@ -33,6 +33,10 @@ module.exports = {
           dark: "#705848",
           steel: "#B8B8D0",
           fairy: "#EE99AC"
+        },
+        base: {
+          "white-light": "#F8F9FA",
+          "black-light": "#232323"
         }
       },
       fontFamily: {
@@ -41,11 +45,16 @@ module.exports = {
       },
       borderRadius: {
         100: "100%"
-      }
+      },
+      transitionProperty: {
+        'spacing': 'margin, padding',
+       }
     }
   },
   variants: {
-    extend: {}
+    extend: {
+      padding: ['group-hover']
+    }
   },
   plugins: [
     function ({ addComponents, theme }) {

@@ -1,72 +1,106 @@
 import { motion } from "framer-motion";
 import fetch from "isomorphic-fetch";
+import Image from "next/image";
 import Link from "next/link";
+import React, { useEffect, useState } from "react";
+import { useInView } from "react-intersection-observer";
 
-let easing = [0.6, -0.05, 0.01, 0.99];
+import Pokeball from "../assets/svg/pokeball.svg";
+import FadeIntoView from "../components/fadeIntoView";
 
-const fadeInUp = {
-  initial: {
-    y: 60,
-    opacity: 0,
-    transition: { duration: 0.6, ease: easing }
-  },
-  animate: {
-    y: 0,
-    opacity: 1,
-    transition: {
-      duration: 0.6,
-      ease: easing
+const Index = data => {
+  const { pokemons: defaultPokemon, next } = data;
+  const [fetching, setFetching] = useState(false);
+  const [pokemon, updatePokemon] = useState(defaultPokemon);
+  const [page, updatePage] = useState({
+    next,
+    current: defaultEndpoint
+  });
+  const { current } = page;
+
+  useEffect(() => {
+    if (current === defaultEndpoint) return;
+    async function request() {
+      setFetching(true);
+      const response = await fetch(current);
+      const nextData = await response.json();
+      const pokemons = await Promise.all(
+        nextData.results.map(async result => {
+          const pokemonResponse = await fetch(result.url);
+          return await pokemonResponse.json();
+        })
+      );
+      const { next } = await nextData;
+      await updatePage({ current, next });
+      await updatePokemon(prev => [...prev, ...pokemons]);
+      setFetching(false);
     }
-  }
-};
+    request();
+  }, [current]);
 
-const stagger = {
-  animate: {
-    transition: {
-      staggerChildren: 0.1
-    }
-  }
-};
+  const { ref, inView, entry } = useInView();
+  useEffect(() => {
+    entry && entry.isIntersecting && handleLoadMore();
+  }, [inView]);
 
-const Index = ({ starters }) => {
+  function handleLoadMore() {
+    updatePage(prev => {
+      return { ...prev, current: page.next };
+    });
+  }
+
   return (
     <motion.main initial="initial" animate="animate" exit={{ opacity: 0 }}>
-      <motion.div variants={stagger}>
-        {starters.map(starter => {
-          const { name, id, sprites } = starter;
-          return (
-            <Link href={`/pokemon/${name}`} key={id}>
-              <motion.div variants={fadeInUp}>
-                <img
-                  className="w-40"
-                  src={sprites.other["official-artwork"].front_default}
-                  alt={name}
-                />
-              </motion.div>
-            </Link>
-          );
-        })}
-      </motion.div>
+      <p className="fixed bottom-0 right-0 px-2 py-2 bg-red-300 rounded-md">
+        {fetching ? "currently fetching" : "done fetching"}
+      </p>
+      <section className="container py-20">
+        <motion.ul className="grid grid-cols-1 gap-6 pb-6 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
+          {pokemon.map(pokemon => {
+            const { id, name, sprites, types } = pokemon;
+            const mainType = types[0].type.name;
+            return (
+              <FadeIntoView key={id}>
+                <Link href={`/pokemon/${name}`}>
+                  <motion.li
+                    className={`bg-opacity-60 transition-colors duration-1000 py-12 ease-out rounded-md shadow-md cursor-pointer bg-types-${`${mainType}`}`}
+                  >
+                    <div className="relative flex items-center justify-center w-full">
+                      <Image
+                        src={sprites.other["official-artwork"].front_default}
+                        alt={name}
+                        width={200}
+                        height={200}
+                      />
+                    </div>
+                  </motion.li>
+                </Link>
+              </FadeIntoView>
+            );
+          })}
+        </motion.ul>
+        <div ref={ref} className="flex justify-center">
+          <Pokeball width="40" className={`${fetching && "animate-spin"}`} />
+        </div>
+      </section>
     </motion.main>
   );
 };
 
+const defaultEndpoint = "https://pokeapi.co/api/v2/pokemon/?limit=20";
 export async function getStaticProps() {
-  const [bulbasaurResponse, charmanderResponse, squirtleResponse] =
-    await Promise.all([
-      fetch("https://pokeapi.co/api/v2/pokemon/1"),
-      fetch("https://pokeapi.co/api/v2/pokemon/4"),
-      fetch("https://pokeapi.co/api/v2/pokemon/7")
-    ]);
-
-  const bulbasaur = await bulbasaurResponse.json();
-  const charmander = await charmanderResponse.json();
-  const squirtle = await squirtleResponse.json();
-
-  const starters = [bulbasaur, charmander, squirtle];
+  const pokemonBaseResponse = await fetch(defaultEndpoint);
+  const pokemonBaseData = await pokemonBaseResponse.json();
+  const { next, results } = pokemonBaseData;
+  const pokemons = await Promise.all(
+    results.map(async result => {
+      const pokemonResponse = await fetch(result.url);
+      return await pokemonResponse.json();
+    })
+  );
 
   return {
-    props: { starters }
+    props: { pokemons, next }
   };
 }
 
